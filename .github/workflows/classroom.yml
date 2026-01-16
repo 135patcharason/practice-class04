@@ -1,0 +1,135 @@
+name: Autograding Tests
+'on':
+- push
+- repository_dispatch
+permissions:
+  checks: write
+  actions: read
+  contents: read
+jobs:
+  run-autograding-tests:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-classroom[bot]'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: 'Test 1: Should have index.html file in the current directory'
+      id: test-1-should-have-index-html-file-in-the-current-directory
+      uses: classroom-resources/autograding-command-grader@v1
+      with:
+        test-name: 'Test 1: Should have index.html file in the current directory'
+        setup-command: ''
+        command: >-
+          if [ -f "index.html" ]; then
+            echo "✅ Test 1 Passed: index.html exists.";
+          else
+            echo "❌ Test 1 Failed: index.html does not exist.";
+            exit 1;
+          fi
+        timeout: 1
+        max-score: 10
+    - name: 'Test 2: Should update index.html with student''s name'
+      id: test-2-should-update-index-html-with-student-s-name
+      uses: classroom-resources/autograding-command-grader@v1
+      with:
+        test-name: 'Test 2: Should update index.html with student''s name'
+        setup-command: ''
+        command: >-
+          EXPECTED_REGEX="id=\"student-name\">[[:space:]]*[A-Za-z]+[[:space:]]+[A-Za-z]+[[:space:]]*<\/h2>";
+          if ! grep -q "<h1 id=\"class\">Class 02 Exercise 2</h1>" index.html; then
+            echo "❌ Test 2 Failed: Class attribute is incorrect.";
+              exit 1;
+          elif grep -q "Replace This With Your Name" index.html; then
+            echo "❌ Test 2 Failed: Placeholder text still present.";
+            exit 1;
+          elif ! grep -qE "$EXPECTED_REGEX" index.html; then
+            echo "❌ Test 2 Failed: expect student-name attribute with full student name.";
+            exit 1;
+          else
+            echo "✅ Test 2 Passed: index.html has been updated with student's name.";
+          fi
+        timeout: 1
+        max-score: 20
+    - name: 'Test 3: Should use correct commit author pattern'
+      id: test-3-should-use-correct-commit-author-pattern
+      uses: classroom-resources/autograding-command-grader@v1
+      with:
+        test-name: 'Test 3: Should use correct commit author pattern'
+        setup-command: ''
+        command: >-
+          EXPECTED_REGEX="^[A-Za-z]+[[:space:]]+[A-Za-z]+[[:space:]]*\(INT142-class02\)$";
+          COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an');
+          if echo "$COMMIT_AUTHOR" | grep -qE "$EXPECTED_REGEX"; then
+            echo "✅ Test 3 Passed: Commit author format is correct.";
+          else
+            echo "❌ Test 3 Failed: Commit author format is incorrect.";
+            echo "   Found author: $COMMIT_AUTHOR";
+            echo "   Expected pattern: Name Surname (INT142-class02)";
+            exit 1;
+          fi
+        timeout: 1
+        max-score: 10
+    - name: 'Test 4: Should use private email in commit'
+      id: test-4-should-use-private-email-in-commit
+      uses: classroom-resources/autograding-command-grader@v1
+      with:
+        test-name: 'Test 4: Should use private email in commit'
+        setup-command: ''
+        command: >-
+          COMMIT_EMAIL=$(git log -1 --pretty=format:'%ae');
+          if echo "$COMMIT_EMAIL" | grep -q "@users.noreply.github.com"; then
+            echo "✅ Test 4 Passed: Commit email is private.";
+          else
+            echo "❌ Test 4 Failed: Commit email is not private.";
+            exit 1;
+          fi
+        timeout: 1
+        max-score: 10
+    - name: 'Test 5: Should use correct commit message'
+      id: test-5-should-use-correct-commit-message
+      uses: classroom-resources/autograding-command-grader@v1
+      with:
+        test-name: 'Test 5: Should use correct commit message'
+        setup-command: ''
+        command: >-
+          EXPECTED_COMMIT_MESSAGE="Update index.html with student name";
+          COMMIT_MSG=$(git log -1 --pretty=format:'%s');
+          COMMIT_MSG=$(echo "$COMMIT_MSG" | xargs);
+          if echo "$COMMIT_MSG" | grep -iqF "$EXPECTED_COMMIT_MESSAGE"; then
+            echo "✅ Test 5 Passed: Commit message is correct.";
+          else
+            echo "❌ Test 5 Failed: Commit message is incorrect.";
+            echo "   Found message: \"$COMMIT_MSG\"";
+            echo "   Expected message: \"$EXPECTED_COMMIT_MESSAGE\"";
+            exit 1;
+          fi
+        timeout: 1
+        max-score: 10
+    - name: 'Test 6: Should initialize git repository first'
+      id: test-6-should-initialize-git-repository-first
+      uses: classroom-resources/autograding-command-grader@v1
+      with:
+        test-name: 'Test 6: Should initialize git repository first'
+        setup-command: ''
+        command: >-
+          git fetch --unshallow || true;
+          count=$(git rev-list --max-parents=0 HEAD | wc -l);
+          if [ "$count" -ge 2 ]; then
+            echo '✅ Test 6 Passed: You initialized locally and merged!';
+          else
+            echo '❌ Test 6 Failed: It looks like you cloned the repository. We found only $count root commit.';
+            exit 1;
+          fi
+        timeout: 1
+        max-score: 40
+    - name: Autograding Reporter
+      uses: classroom-resources/autograding-grading-reporter@v1
+      env:
+        TEST-1-SHOULD-HAVE-INDEX-HTML-FILE-IN-THE-CURRENT-DIRECTORY_RESULTS: "${{steps.test-1-should-have-index-html-file-in-the-current-directory.outputs.result}}"
+        TEST-2-SHOULD-UPDATE-INDEX-HTML-WITH-STUDENT-S-NAME_RESULTS: "${{steps.test-2-should-update-index-html-with-student-s-name.outputs.result}}"
+        TEST-3-SHOULD-USE-CORRECT-COMMIT-AUTHOR-PATTERN_RESULTS: "${{steps.test-3-should-use-correct-commit-author-pattern.outputs.result}}"
+        TEST-4-SHOULD-USE-PRIVATE-EMAIL-IN-COMMIT_RESULTS: "${{steps.test-4-should-use-private-email-in-commit.outputs.result}}"
+        TEST-5-SHOULD-USE-CORRECT-COMMIT-MESSAGE_RESULTS: "${{steps.test-5-should-use-correct-commit-message.outputs.result}}"
+        TEST-6-SHOULD-INITIALIZE-GIT-REPOSITORY-FIRST_RESULTS: "${{steps.test-6-should-initialize-git-repository-first.outputs.result}}"
+      with:
+        runners: test-1-should-have-index-html-file-in-the-current-directory,test-2-should-update-index-html-with-student-s-name,test-3-should-use-correct-commit-author-pattern,test-4-should-use-private-email-in-commit,test-5-should-use-correct-commit-message,test-6-should-initialize-git-repository-first
